@@ -69,7 +69,14 @@ const fucrPageHeader: Parser<unknown> = (ptr) => {
 		if (!t) break;
 		const name = nextToken(inc(current));
 		const lv = nextToken(inc(inc(current)));
-		if (isImageToken(t) && name && isStringToken(name) && lv && isStringToken(lv) && /^Lv \d+/.test(lv.string)) {
+		if (
+			isImageToken(t) &&
+			name &&
+			isStringToken(name) &&
+			lv &&
+			isStringToken(lv) &&
+			/^(Lv|Nvl\.) \d+/.test(lv.string)
+		) {
 			break;
 		}
 		current = inc(current);
@@ -84,7 +91,7 @@ export const FUCR_FONTS: BeastiaryFonts = {
 	spellHeaderIcon: { char: "c", fonts: [/FabulaUltimaicons-Regular$/] },
 	spellAccuracyIcon: { char: "O", fonts: [/Type3$/] },
 	otherActionIcon: { char: "S", fonts: [/FabulaUltimaicons-Regular$/] },
-	sep: { char: "•", fonts: [/FabulaUltimaicons-Regular$/] },
+	sep: { char: "w", fonts: [/Wingdings-Regular$/, /FabulaUltimaicons-Regular$/] },
 	bracketOpen: { char: "(", fonts: [/FabulaUltimaicons-Regular$/] },
 	bracketClose: { char: ")", fonts: [/FabulaUltimaicons-Regular$/] },
 	boldFonts: [/PTSans-NarrowBold$/],
@@ -107,15 +114,17 @@ export const FUCR_FONTS: BeastiaryFonts = {
 	},
 };
 
-const beastAttribute = (stat: Stat) =>
-	fmap(matches(new RegExp(`^${stat} d(${DIE_SIZES.join("|")})`), stat), (t) =>
-		Number(t.slice(stat.length + 2)),
+const beastAttribute = (stat: Stat, aliases: string[] = [stat]) =>
+	fmap(matches(new RegExp(`^(?:${aliases.join("|")}) d(${DIE_SIZES.join("|")})`), stat), (t) =>
+		Number(t.slice(t.indexOf("d") + 1)),
 	) as Parser<DieSize>;
-const dex = beastAttribute("DEX");
-const ins = beastAttribute("INS");
-const mig = beastAttribute("MIG");
-const wlp = beastAttribute("WLP");
-const beastInit = fmap(matches(/^Init\. [0-9]+$/, "beast init"), (s) => Number(s.slice(6)));
+const dex = beastAttribute("DEX", ["DEX", "DES"]);
+const ins = beastAttribute("INS", ["INS", "AST"]);
+const mig = beastAttribute("MIG", ["MIG", "VIG"]);
+const wlp = beastAttribute("WLP", ["WLP", "VON"]);
+const beastInit = fmap(matches(/^(Init\.|Inic\.) [0-9]+$/, "beast init"), (s) =>
+	Number(s.split(" ")[1]),
+);
 const beastDef = (prefix: string) =>
 	fmap(matches(new RegExp(`^${prefix} \\+?[0-9]+$`), "beast def"), (s) => Number(s.slice(prefix.length + 1)));
 
@@ -128,7 +137,7 @@ const makeBeastAttributes = (fonts: BeastiaryFonts) => {
 			mig,
 			wlp,
 			kr(
-				text("HP"),
+				alt(text("HP"), text("PV")),
 				fmap(matches(/^[0-9]+$/, "HP"), (s) => Number(s)),
 			),
 			kr(
@@ -136,7 +145,7 @@ const makeBeastAttributes = (fonts: BeastiaryFonts) => {
 				fmap(matches(/^[0-9]+$/, "Crisis"), (s) => Number(s)),
 			),
 			kr(
-				text("MP"),
+				alt(text("MP"), text("PM")),
 				fmap(matches(/^[0-9]+$/, "MP"), (s) => Number(s)),
 			),
 			beastInit,
@@ -174,7 +183,10 @@ const makeBeastResistances = (fonts: BeastiaryFonts): Parser<ResistanceMap> => {
 	}, success({})) as Parser<ResistanceMap>;
 };
 
-const DESCRIPTION_LINE_EXCLUSIONS = /^(Opportunity:|(Typical )?Traits:)/;
+const DESCRIPTION_LINE_EXCLUSIONS = /^(Opportunity:|Oportunidade:|(Typical )?Traits:|Traços típicos:)/;
+
+const localizedText = (...values: string[]): Parser<StringToken> =>
+	values.slice(1).reduce((parser, value) => alt(parser, text(value)), text(values[0]));
 
 const makeDescriptionLine = (fonts: BeastiaryFonts) =>
 	fmap(
@@ -283,7 +295,7 @@ const makeSpecialRule = (fonts: BeastiaryFonts) => {
 
 const makeOpportunity = (fonts: BeastiaryFonts) => {
 	const description = makeDescription(fonts);
-	return kr(text("Opportunity:"), description);
+	return kr(localizedText("Opportunity:", "Oportunidade:"), description);
 };
 
 const makeBeastSpells = (fonts: BeastiaryFonts) => {
@@ -299,7 +311,7 @@ const makeBeastSpells = (fonts: BeastiaryFonts) => {
 		(t) => t.string,
 	);
 	return kr(
-		text("SPELLS"),
+		localizedText("SPELLS", "FEITIÇOS"),
 		many1(
 			fmap(
 				seq(
@@ -343,10 +355,10 @@ export const makeBeastiary = (fonts: BeastiaryFonts): Parser<Beast[]> => {
 	const beastAttack = makeBeastAttack(fonts);
 	const specialRule = makeSpecialRule(fonts);
 	const beastSpells = makeBeastSpells(fonts);
-	const beastAttacks = kr(text("BASIC ATTACKS"), many1(beastAttack));
-	const specialRules = kr(text("SPECIAL RULES"), many1(specialRule));
+	const beastAttacks = kr(localizedText("BASIC ATTACKS", "ATAQUES BÁSICOS"), many1(beastAttack));
+	const specialRules = kr(localizedText("SPECIAL RULES", "REGRAS ESPECIAIS"), many1(specialRule));
 	const otherActions = kr(
-		text("OTHER ACTIONS"),
+		localizedText("OTHER ACTIONS", "OUTRAS AÇÕES"),
 		many1(kr(many1(textWithFont(fonts.otherActionIcon.char, fonts.otherActionIcon.fonts)), specialRule)),
 	);
 
@@ -354,15 +366,15 @@ export const makeBeastiary = (fonts: BeastiaryFonts): Parser<Beast[]> => {
 		seq(
 			image,
 			str,
-			fmap(matches(/^Lv \d+/, "Level"), (s) => Number(s.slice(3))),
+			fmap(matches(/^(Lv|Nvl\.) \d+/, "Level"), (s) => Number(s.replace(/^(Lv|Nvl\.) /, ""))),
 			kr(sep, str),
 			description,
-			kr(matches(/^(Typical )?Traits:$/, "Traits"), str),
+			kr(matches(/^(Typical )?Traits:|^Traços típicos:$/, "Traits"), str),
 			beastAttributes,
 			beastResistances,
 			alt(
 				kr(
-					text("Equipment:"),
+					localizedText("Equipment:", "Equipamento:"),
 					fmap(str, (s) => s.slice(0, -1).split(", ")),
 				),
 				success(null),

@@ -1,7 +1,7 @@
 # Fabula Ultima importer
 
 This [Foundry Virtual Tabletop](https://foundryvtt.com/) module is designed to work with [Unofficial Fabula Ultima System](https://github.com/League-of-Fabulous-Developers/FoundryVTT-Fabula-Ultima).  It add buttons for importing data from:
-1. an english pdf, watermarked by DriveThruRPG, of [Fabula Ultima](https://www.needgames.it/fabula-ultima-en/) by [Need Games](https://www.needgames.it/)
+1. an english or Brazilian Portuguese PDF, watermarked by DriveThruRPG, of [Fabula Ultima](https://www.needgames.it/fabula-ultima-en/) by [Need Games](https://www.needgames.it/)
 2. [Fultimator!](https://fabula-ultima-helper.web.app/)
 
 ## Installation
@@ -13,6 +13,8 @@ This [Foundry Virtual Tabletop](https://foundryvtt.com/) module is designed to w
 5. Launch a game world and go to Game Settings > Manage Modules and enable the module.
 
 ## PDF Import
+
+For the Brazilian Portuguese core rulebook, select **Core Rulebook (Português Brasil)** in the book type selector. The importer supports the Portuguese equipment and rare equipment tables, as well as the Portuguese bestiary profiles included in the core rulebook.
 
 It will currently import and create Items and Actors for:
 * Armor, Accessories, Shields, Weapons

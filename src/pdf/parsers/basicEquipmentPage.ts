@@ -53,7 +53,25 @@ const martial = alt(
 	fmap(textWithFont("W", [/Type3$/]), () => true),
 	success(false),
 );
-const damageType = fmap(strWithFont([/PTSans-NarrowBold$/]), (s) => s as DamageType);
+const damageType = fmap(strWithFont([/PTSans-NarrowBold$/]), (s) => {
+	const normalized = s
+		.toLowerCase()
+		.normalize("NFD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.replace(/^(de|do|da|dos|das)\s+/, "");
+	const types: Record<string, DamageType> = {
+		fisico: "physical",
+		ar: "air",
+		raio: "bolt",
+		trevas: "dark",
+		terra: "earth",
+		fogo: "fire",
+		gelo: "ice",
+		luz: "light",
+		veneno: "poison",
+	};
+	return (types[normalized] ?? normalized) as DamageType;
+});
 
 const weaponListing: Parser<Omit<Weapon, "category">> = fmap(
 	seq(
@@ -91,8 +109,36 @@ function asWeaponCategory(s: string, ptr: [Token[], number]) {
 
 const categoryTitle: Parser<WeaponCategory> = (ptr) => {
 	const token = nextToken(ptr);
-	if (token && isStringToken(token) && token.string.endsWith(" Category")) {
-		return asWeaponCategory(token.string.slice(0, -9).toLowerCase(), ptr);
+	if (token && isStringToken(token)) {
+		const raw = token.string.endsWith(" Category")
+			? token.string.slice(0, -9)
+			: token.string.replace(/^Categoria[s]? de /, "");
+		if (raw !== token.string || token.string.endsWith(" Category")) {
+			const aliases: Record<string, WeaponCategory> = {
+				arcana: "arcane",
+				"armas arcanas": "arcane",
+				arco: "bow",
+				arcos: "bow",
+				luta: "brawling",
+				"armas de luta": "brawling",
+				adaga: "dagger",
+				adagas: "dagger",
+				"arma de fogo": "firearm",
+				"armas de fogo": "firearm",
+				malho: "flail",
+				malhos: "flail",
+				pesada: "heavy",
+				pesadas: "heavy",
+				lança: "spear",
+				lanças: "spear",
+				espada: "sword",
+				espadas: "sword",
+				arremessável: "thrown",
+				arremesso: "thrown",
+			};
+			const category = aliases[raw.toLowerCase().replace(/^armas /, "armas ")] ?? raw.toLowerCase();
+			return asWeaponCategory(category, ptr);
+		}
 	}
 	return fail<WeaponCategory>("Category")(ptr);
 };
@@ -106,7 +152,7 @@ const PREAMBLE_FONTS = [/Antonio-Regular$/, /Antonio-Bold$/, /BodoniOrnamentsITC
 const preambleTokens = many(
 	satisfy((t) => isImageToken(t) || (isStringToken(t) && PREAMBLE_FONTS.some((f) => f.test(t.font))), "preamble"),
 );
-const ending = then(alt(then(text("BASIC WEAPONS"), watermark), watermark), eof);
+const ending = then(alt(then(alt(text("BASIC WEAPONS"), text("ARMAS BÁSICAS")), watermark), watermark), eof);
 
 export const basicWeaponsV11: Parser<Weapon[]> = fmap(kl(kr(preambleTokens, many1(weaponsBlock)), ending), (k) =>
 	k.flat(1),

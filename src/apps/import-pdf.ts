@@ -2,6 +2,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import { tokenizePDF } from "../pdf/lexers/pdf";
 import {
 	importCoreRulebook,
+	importCorePortuguese,
 	importCoreBestiary,
 	importCoreBasicEquipment,
 	importHighFantasyBestiary,
@@ -44,6 +45,8 @@ const parsePdf = async (pdfPath: string, bookType: BookType): Promise<[ParseResu
 				],
 				destroy,
 			];
+		case "FUCR_PTBR":
+			return [await importCorePortuguese(withPage), destroy];
 		case "FUHF":
 			return [
 				[...(await importItems(withPage, bookType)), ...(await importHighFantasyBestiary(withPage))],
@@ -65,9 +68,10 @@ const parsePdf = async (pdfPath: string, bookType: BookType): Promise<[ParseResu
 };
 
 export type BookType = (typeof BOOK_TYPES)[number];
-export const BOOK_TYPES = ["FUCR", "FUCR_LEGACY", "FUHF", "FUTF", "FUNF", "FUBA"] as const;
+export const BOOK_TYPES = ["FUCR", "FUCR_PTBR", "FUCR_LEGACY", "FUHF", "FUTF", "FUNF", "FUBA"] as const;
 export const bookTypes = {
 	FUCR: "Core Rulebook (v1.1)",
+	FUCR_PTBR: "Core Rulebook (Português Brasil)",
 	FUCR_LEGACY: "Core Rulebook (v1.02)",
 	FUHF: "High Fantasy Atlas (v1.1)",
 	FUTF: "Techno Fantasy Atlas (v1.1)",

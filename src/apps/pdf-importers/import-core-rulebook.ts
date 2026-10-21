@@ -8,6 +8,7 @@ import { armorPage } from "../../pdf/parsers/armorPage";
 import { shieldPage } from "../../pdf/parsers/shieldPage";
 import { accessories } from "../../pdf/parsers/accessoryPage";
 import { beastiaryFUCR } from "../../pdf/parsers/beastiaryPage";
+import { beastiaryFUCRPortuguese } from "../../pdf/parsers/beastiaryPagePortuguese";
 import { basicWeaponsV11, consumablesV11 } from "../../pdf/parsers/basicEquipmentPage";
 import { beastiary } from "../../pdf/parsers/beastiaryPageLegacy";
 import { beastiaryFUHF, beastiaryFUTF, beastiaryFUNF } from "../../pdf/parsers/beastiaryPageAtlas";
@@ -362,6 +363,37 @@ const PAGES = {
 	355: [["Beastiary"], (f: Wrapper) => f(beastiary, saveBeasts)],
 } as const;
 
+const PT_BR_PAGES = {
+	108: [["Equipment", "Consumables"], (f: Wrapper) => f(consumablesPage, saveConsumables)],
+	134: [["Equipment", "Weapons", "Basic"], (f: Wrapper) => f(basicWeapons, saveWeapons)],
+	135: [["Equipment", "Weapons", "Basic"], (f: Wrapper) => f(basicWeapons, saveWeapons)],
+	136: [["Equipment", "Armors", "Basic"], (f: Wrapper) => f(armorPage, saveArmors)],
+	137: [["Equipment", "Shields", "Basic"], (f: Wrapper) => f(shieldPage, saveShields)],
+	274: [["Equipment", "Weapons", "Rare"], (f: Wrapper) => f(rareWeapons, saveWeapons)],
+	275: [["Equipment", "Weapons", "Rare"], (f: Wrapper) => f(rareWeapons, saveWeapons)],
+	276: [["Equipment", "Weapons", "Rare"], (f: Wrapper) => f(rareWeapons, saveWeapons)],
+	277: [["Equipment", "Weapons", "Rare"], (f: Wrapper) => f(rareWeapons, saveWeapons)],
+	278: [["Equipment", "Weapons", "Rare"], (f: Wrapper) => f(rareWeapons, saveWeapons)],
+	279: [["Equipment", "Weapons", "Rare"], (f: Wrapper) => f(rareWeapons, saveWeapons)],
+	280: [["Equipment", "Weapons", "Rare"], (f: Wrapper) => f(rareWeapons, saveWeapons)],
+	281: [["Equipment", "Weapons", "Rare"], (f: Wrapper) => f(rareWeapons, saveWeapons)],
+	282: [["Equipment", "Weapons", "Rare"], (f: Wrapper) => f(rareWeapons, saveWeapons)],
+	283: [["Equipment", "Weapons", "Rare"], (f: Wrapper) => f(rareWeapons, saveWeapons)],
+	285: [["Equipment", "Armors", "Rare"], (f: Wrapper) => f(armorPage, saveArmors)],
+	286: [["Equipment", "Armors", "Rare"], (f: Wrapper) => f(armorPage, saveArmors)],
+	287: [["Equipment", "Shields", "Rare"], (f: Wrapper) => f(shieldPage, saveShields)],
+	289: [["Equipment", "Accessories"], (f: Wrapper) => f(accessories, saveAccessories)],
+} as const satisfies Record<number, [readonly string[], (f: Wrapper) => Promise<ParseResult>]>;
+
+const PT_BR_BESTIARY_PAGES = Object.fromEntries(
+	[
+		...Array.from({ length: 9 }, (_, index) => 328 + index),
+		...Array.from({ length: 7 }, (_, index) => 338 + index),
+		...Array.from({ length: 3 }, (_, index) => 346 + index),
+		...Array.from({ length: 7 }, (_, index) => 350 + index),
+	].map((page) => [page, [["Beastiary"], (f: Wrapper) => f(beastiaryFUCRPortuguese, saveBeasts, true)]]),
+) as Record<number, [readonly string[], (f: Wrapper) => Promise<ParseResult>]>;
+
 const pr = (z: string | StringToken) => (typeof z === "string" ? z : `<Text str="${z.string}" font="${z.font}">`);
 
 function importPages(
@@ -446,6 +478,12 @@ export function importCoreRulebook(
 	withPage: <R>(pageNum: number, f: (d: Token[]) => Promise<R>) => Promise<[R, () => boolean]>,
 ): Promise<ParseResult[]> {
 	return importPages(PAGES, "FUCR", withPage, undefined, undefined, false);
+}
+
+export function importCorePortuguese(
+	withPage: <R>(pageNum: number, f: (d: Token[]) => Promise<R>) => Promise<[R, () => boolean]>,
+): Promise<ParseResult[]> {
+	return importPages({ ...PT_BR_PAGES, ...PT_BR_BESTIARY_PAGES }, "FUCR-PT", withPage, undefined, undefined, false);
 }
 
 export function importCoreBestiary(
