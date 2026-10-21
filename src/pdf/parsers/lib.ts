@@ -238,7 +238,9 @@ const DAMAGE_TYPE_ALIASES: Record<string, DamageType> = {
 export const normalizeText = (value: string) =>
 	value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 export const damageType: Parser<DamageType> = fmap(many1(str), (ts) => {
-	const raw = normalizeText(ts.join("")).replace(/^(de|do|da|dos|das)\s+/, "");
+	const raw = normalizeText(ts.join(""))
+		.replace(/^(dos|das|de|do|da)/, "")
+		.trim();
 	return (DAMAGE_TYPE_ALIASES[raw] ?? raw) as DamageType;
 });
 export const hands: Parser<Handed> = alt(
