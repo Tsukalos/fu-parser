@@ -7,13 +7,11 @@ export const isDash = (s: string) => s === "-" || s === "–" || s === "—";
 export const convertDashOrNumber = (s: string) => (isDash(s) ? 0 : Number(s));
 
 export const convertCosts = (s: string) => {
-	if (s.endsWith(" z")) {
-		return Number(s.slice(0, -2));
-	} else if (isDash(s)) {
+	const normalized = s.trim().replace(/\s*z$/i, "").replace(/\./g, "");
+	if (isDash(normalized)) {
 		return 0;
-	} else {
-		return Number(s);
 	}
+	return Number(normalized);
 };
 
 export const titleCase = (s: string): string =>

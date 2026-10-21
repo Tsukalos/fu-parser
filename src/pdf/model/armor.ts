@@ -20,7 +20,11 @@ export const convertDef = (prefix: string) => (s: string) => {
 	} else if (s.startsWith(prefix + " die")) {
 		const num = s.slice(9);
 		return num === "" ? 0 : Number(num);
-	} else return isDash(s) ? 0 : Number(s);
+	} else {
+		const translatedDie = s.match(/^Dado de (?:DES|AST)(?: ([+-]\d+))?$/);
+		if (translatedDie) return translatedDie[1] ? Number(translatedDie[1]) : 0;
+		return isDash(s) ? 0 : Number(s);
+	}
 };
 
 export function armorToFuItem(data: Armor, imagePath: string, folderId: string, source: string): FUItem {

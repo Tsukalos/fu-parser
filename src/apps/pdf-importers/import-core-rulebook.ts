@@ -412,7 +412,14 @@ function importPages(
 				const [r, cleanup] = await withPage(pageNum, async (data) => {
 					const source = sourcePrefix + (pageNum - 2);
 					const parses = parser([data, 0]);
-					const successes = parses.filter(isResult);
+					const successes = parses.filter(isResult).filter(
+						(parse, index, all) =>
+							all.findIndex(
+								(other) =>
+									other.result[1][1] === parse.result[1][1] &&
+									JSON.stringify(other.result[0]) === JSON.stringify(parse.result[0]),
+							) === index,
+					);
 					if (successes.length == 1) {
 						if (rankIndex) {
 							applyRankIndex(successes[0].result[0] as unknown as Beast[], rankIndex);
