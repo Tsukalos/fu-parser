@@ -167,6 +167,18 @@ const atlasPageTail: Parser<unknown> = (ptr) => {
 	return [result(null, current)];
 };
 
+const atlasWatermarkTail: Parser<unknown> = (ptr) => {
+	let current = ptr;
+	let consumed = false;
+	for (;;) {
+		const t = nextToken(current);
+		if (!t || !isStringToken(t) || !/(Helvetica|BodoniOrnamentsITCTT)$/.test(t.font)) break;
+		consumed = true;
+		current = inc(current);
+	}
+	return consumed ? [result(null, current)] : [{ error: "watermark", distance: ptr[1], found: "<eof>" }];
+};
+
 const atlasNullImage: Image = { width: 0, height: 0 };
 
 // Consume an image token if present, otherwise succeed without advancing (some atlas beasts have no image).
@@ -207,8 +219,8 @@ const beastAttribute = (stat: string, label = stat) =>
 
 const makeBeastAttributes = (fonts: AtlasFonts) => {
 	const sep = textWithFont(fonts.sep.char, fonts.sep.fonts);
-	const hpValue = fmap(matches(/^[0-9]+$|^(Special|Especial)$/, "HP"), (s) =>
-		s === "Special" || s === "Especial" ? 0 : Number(s),
+	const hpValue = fmap(matches(/^[0-9]+$|^(Special|Especial)$/i, "HP"), (s) =>
+		/^(special|especial)$/i.test(s) ? 0 : Number(s),
 	);
 	// When HP is "Special" the crisis value is omitted from the stat block.
 	const hpAndCrisis: Parser<[number, number]> = (ptr) => {
@@ -233,15 +245,29 @@ const makeBeastAttributes = (fonts: AtlasFonts) => {
 			beastAttribute("MIG", fonts.locale === "pt-BR" ? "VIG" : "MIG"),
 			beastAttribute("WLP", fonts.locale === "pt-BR" ? "VON" : "WLP"),
 			hpAndCrisis,
-			kr(
-				text(fonts.locale === "pt-BR" ? "PM" : "MP"),
-				fmap(matches(/^[0-9]+$/, "MP"), (s) => Number(s)),
-			),
+			fonts.locale === "pt-BR"
+				? alt(
+						kr(text("PM"), fmap(matches(/^[0-9]+$/, "MP"), (s) => Number(s))),
+						fmap(
+							seq(text("PM"), fmap(matches(/^[0-9]+$/, "MP"), (s) => Number(s))),
+							([, value]) => value,
+						),
+					)
+				: kr(
+						text("MP"),
+						fmap(matches(/^[0-9]+$/, "MP"), (s) => Number(s)),
+					),
 			fmap(matches(fonts.locale === "pt-BR" ? /^(Init\.|Inic\.) [0-9]+$/ : /^Init\. [0-9]+$/, "beast init"), (s) =>
 				Number(s.split(" ")[1]),
 			),
-			fmap(matches(/^DEF \+?[0-9]+(?:\/\+?[0-9]+)?$/, "beast def"), (s) =>
-				Number(s.slice(4).split("/")[0].replace("+", "")),
+			fmap(
+				fonts.locale === "pt-BR"
+					? alt(
+							matches(/^DEF \+?[0-9]+(?:\/\+?[0-9]+)?$/, "beast def"),
+							kr(text("DEF"), matches(/^\+?[0-9]+(?:\/\+?[0-9]+)?$/, "beast def")),
+						)
+					: matches(/^DEF \+?[0-9]+(?:\/\+?[0-9]+)?$/, "beast def"),
+				(s) => Number(s.replace(/^DEF\s*/, "").split("/")[0].replace("+", "")),
 			),
 			// Atlas uses "M. DEF" (with space) instead of "M.DEF"
 			fmap(
@@ -666,7 +692,7 @@ export const makeAtlasBeastiary = (fonts: AtlasFonts): Parser<Beast[]> => {
 
 	return kl(
 		kr(makeAtlasPageHeader(fonts), committedBeasts),
-		seq(atlasPageTail, alt(many1(strWithFont([/Helvetica$/, /BodoniOrnamentsITCTT$/])), eof)),
+		seq(atlasPageTail, atlasWatermarkTail, eof),
 	);
 };
 
