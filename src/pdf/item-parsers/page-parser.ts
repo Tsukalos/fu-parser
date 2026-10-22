@@ -11,7 +11,7 @@ import { parseCampActivity } from "./camp-activity-parser";
 
 export function parsePage(pageData: Token[]): Map<ItemCategory, Item[]> {
 	const watermark = pageData[pageData.length - 1];
-	if (watermark.kind !== "String" || asStringToken(watermark).font !== "Helvetica") {
+	if (watermark.kind !== "String" || !/(Helvetica|BodoniOrnamentsITCTT)$/.test(asStringToken(watermark).font)) {
 		throw new Error("Failed to parse page because it is not watermarked.");
 	} else {
 		const [itemTokensByCategory, optionalWeaponCategory] = itemizeTokens(pageData);

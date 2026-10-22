@@ -73,9 +73,9 @@ export const bookTypes = {
 	FUCR: "Core Rulebook (v1.1)",
 	FUCR_PTBR: "Core Rulebook (Português Brasil)",
 	FUCR_LEGACY: "Core Rulebook (v1.02)",
-	FUHF: "High Fantasy Atlas (v1.1)",
-	FUTF: "Techno Fantasy Atlas (v1.1)",
-	FUNF: "Natural Fantasy Atlas (v1.1)",
+	FUHF: "High Fantasy Atlas (Português Brasil, v1.04)",
+	FUTF: "Techno Fantasy Atlas (Português Brasil, v1.02)",
+	FUNF: "Natural Fantasy Atlas (Português Brasil, v1.01)",
 	FUBA: "Bestiary Vol.1",
 };
 

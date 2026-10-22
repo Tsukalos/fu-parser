@@ -59,6 +59,7 @@ export interface AtlasFonts
 	asideFonts: RegExp[];
 	asideHeaderFonts: RegExp[];
 	asideAltFonts: RegExp[];
+	locale?: "pt-BR";
 }
 
 const ATLAS_COMMON: Omit<AtlasFonts, "sep"> = {
@@ -91,15 +92,35 @@ const ATLAS_COMMON: Omit<AtlasFonts, "sep"> = {
 export const FUHF_FONTS: AtlasFonts = { ...ATLAS_COMMON, sep: { char: "•", fonts: [/FabulaUltimaicons-Regular$/] } };
 export const FUTF_FONTS: AtlasFonts = { ...ATLAS_COMMON, sep: { char: "-", fonts: [/FabulaUltimaicons-Regular$/] } };
 export const FUNF_FONTS: AtlasFonts = { ...ATLAS_COMMON, sep: { char: "•", fonts: [/FabulaUltimaicons-Regular$/] } };
+export const FUHF_PTBR_FONTS: AtlasFonts = {
+	...ATLAS_COMMON,
+	sep: { char: "w", fonts: [/Wingdings-Regular$/] },
+	locale: "pt-BR",
+};
+export const FUTF_PTBR_FONTS: AtlasFonts = FUHF_PTBR_FONTS;
+export const FUNF_PTBR_FONTS: AtlasFonts = FUHF_PTBR_FONTS;
 
 const ATLAS_ORNAMENT_FONT = /BodoniOrnamentsITCTT$/;
 const ATLAS_LEVEL_FONT = /Antonio-Regular$/;
 // Section headers (BASIC ATTACKS, SPELLS, etc.) and beast names are Antonio-Bold.
 const ATLAS_SECTION_FONT = /Antonio-Bold$/;
+const atlasLevelPattern = (fonts: AtlasFonts) => (fonts.locale === "pt-BR" ? /^Nvl\. \d+$/ : /^Lv \d+$/);
 
 // Skips the page number, W ornament, and chapter decoration up to the first beast name
 // (the string token immediately before "Lv N" in Antonio-Regular).
-const atlasPageHeader: Parser<unknown> = (ptr) => {
+const makeAtlasPageHeader = (fonts: AtlasFonts): Parser<unknown> => (ptr) => {
+	if (fonts.locale === "pt-BR") {
+		let current = ptr;
+		for (;;) {
+			const t = nextToken(current);
+			if (!t) return [result(null, current)];
+			if (isStringToken(t) && atlasLevelPattern(fonts).test(t.string) && ATLAS_LEVEL_FONT.test(t.font)) {
+				const previous = current[1] > ptr[1] ? [ptr[0], current[1] - 1] as typeof ptr : ptr;
+				return [result(null, previous)];
+			}
+			current = inc(current);
+		}
+	}
 	const t0 = nextToken(ptr);
 	if (!t0 || !isStringToken(t0)) return [{ error: "page number", distance: ptr[1], found: "<eof>" }];
 	let current = inc(ptr);
@@ -111,8 +132,8 @@ const atlasPageHeader: Parser<unknown> = (ptr) => {
 	while (t) {
 		if (isStringToken(t)) {
 			const next = nextToken(inc(current));
-			if (next && isStringToken(next) && /^Lv \d+$/.test(next.string) && ATLAS_LEVEL_FONT.test(next.font)) break;
-			if (/^Lv \d+$/.test(t.string) && ATLAS_LEVEL_FONT.test(t.font)) break;
+			if (next && isStringToken(next) && atlasLevelPattern(fonts).test(next.string) && ATLAS_LEVEL_FONT.test(next.font)) break;
+			if (atlasLevelPattern(fonts).test(t.string) && ATLAS_LEVEL_FONT.test(t.font)) break;
 		} else if (isImageToken(t)) {
 			// Stop before the image if the token after it is the beast name (followed by Lv N).
 			const afterImg = inc(current);
@@ -123,7 +144,7 @@ const atlasPageHeader: Parser<unknown> = (ptr) => {
 				isStringToken(name) &&
 				lvToken &&
 				isStringToken(lvToken) &&
-				/^Lv \d+$/.test(lvToken.string) &&
+				atlasLevelPattern(fonts).test(lvToken.string) &&
 				ATLAS_LEVEL_FONT.test(lvToken.font)
 			)
 				break;
@@ -140,7 +161,7 @@ const atlasPageTail: Parser<unknown> = (ptr) => {
 	for (;;) {
 		const t = nextToken(current);
 		if (!t) break;
-		if (isStringToken(t) && /Helvetica$/.test(t.font)) break;
+		if (isStringToken(t) && /(Helvetica|BodoniOrnamentsITCTT)$/.test(t.font)) break;
 		current = inc(current);
 	}
 	return [result(null, current)];
@@ -160,7 +181,12 @@ const atlasTraitsHeader =
 	(boldFonts: RegExp[]): Parser<unknown> =>
 	(ptr) => {
 		const t = nextToken(ptr);
-		if (t && isStringToken(t) && boldFonts.some((f) => f.test(t.font)) && /^(Typical )?Traits:?$/.test(t.string)) {
+		if (
+			t &&
+			isStringToken(t) &&
+			boldFonts.some((f) => f.test(t.font)) &&
+			/^(Typical )?Traits:?$|^Traços:?$/.test(t.string)
+		) {
 			let current = inc(ptr);
 			const next = nextToken(current);
 			if (next && isStringToken(next) && boldFonts.some((f) => f.test(next.font)) && next.string === ":") {
@@ -174,17 +200,19 @@ const atlasTraitsHeader =
 const atlasOpportunityHeader = (boldFonts: RegExp[]) =>
 	seq(strWithFont(boldFonts), strWithFont(boldFonts)) as Parser<unknown>;
 
-const beastAttribute = (stat: string) =>
-	fmap(matches(new RegExp(`^${stat} d(${DIE_SIZES.join("|")})`), stat), (t) =>
-		Number(t.slice(stat.length + 2)),
+const beastAttribute = (stat: string, label = stat) =>
+	fmap(matches(new RegExp(`^${label} d(${DIE_SIZES.join("|")})`), stat), (t) =>
+		Number(t.slice(label.length + 2)),
 	) as Parser<DieSize>;
 
 const makeBeastAttributes = (fonts: AtlasFonts) => {
 	const sep = textWithFont(fonts.sep.char, fonts.sep.fonts);
-	const hpValue = fmap(matches(/^[0-9]+$|^Special$/, "HP"), (s) => (s === "Special" ? 0 : Number(s)));
+	const hpValue = fmap(matches(/^[0-9]+$|^(Special|Especial)$/, "HP"), (s) =>
+		s === "Special" || s === "Especial" ? 0 : Number(s),
+	);
 	// When HP is "Special" the crisis value is omitted from the stat block.
 	const hpAndCrisis: Parser<[number, number]> = (ptr) => {
-		const hp = kr(text("HP"), hpValue)(ptr);
+		const hp = kr(text(fonts.locale === "pt-BR" ? "PV" : "HP"), hpValue)(ptr);
 		const ok = hp.filter(isResult);
 		if (ok.length === 0) return hp as Parse<[number, number]>[];
 		const [hpVal, afterHp] = ok[0].result;
@@ -200,21 +228,26 @@ const makeBeastAttributes = (fonts: AtlasFonts) => {
 	};
 	return fmap(
 		seq(
-			beastAttribute("DEX"),
-			beastAttribute("INS"),
-			beastAttribute("MIG"),
-			beastAttribute("WLP"),
+			beastAttribute("DEX", fonts.locale === "pt-BR" ? "DES" : "DEX"),
+			beastAttribute("INS", fonts.locale === "pt-BR" ? "AST" : "INS"),
+			beastAttribute("MIG", fonts.locale === "pt-BR" ? "VIG" : "MIG"),
+			beastAttribute("WLP", fonts.locale === "pt-BR" ? "VON" : "WLP"),
 			hpAndCrisis,
 			kr(
-				text("MP"),
+				text(fonts.locale === "pt-BR" ? "PM" : "MP"),
 				fmap(matches(/^[0-9]+$/, "MP"), (s) => Number(s)),
 			),
-			fmap(matches(/^Init\. [0-9]+$/, "beast init"), (s) => Number(s.slice(6))),
+			fmap(matches(fonts.locale === "pt-BR" ? /^(Init\.|Inic\.) [0-9]+$/ : /^Init\. [0-9]+$/, "beast init"), (s) =>
+				Number(s.split(" ")[1]),
+			),
 			fmap(matches(/^DEF \+?[0-9]+(?:\/\+?[0-9]+)?$/, "beast def"), (s) =>
 				Number(s.slice(4).split("/")[0].replace("+", "")),
 			),
 			// Atlas uses "M. DEF" (with space) instead of "M.DEF"
-			fmap(matches(/^M\.? DEF \+?[0-9]+$/, "beast mdef"), (s) => Number(s.replace(/^M\.? DEF \+?/, ""))),
+			fmap(
+				matches(fonts.locale === "pt-BR" ? /^DEF\.M \+?[0-9]+$/ : /^M\.? DEF \+?[0-9]+$/, "beast mdef"),
+				(s) => Number(s.replace(fonts.locale === "pt-BR" ? /^DEF\.M \+?/ : /^M\.? DEF \+?/, "")),
+			),
 		),
 		([dex, ins, mig, wlp, [maxHp, crisis], maxMp, init, def, mdef]) => ({
 			dex,
@@ -232,6 +265,41 @@ const makeBeastAttributes = (fonts: AtlasFonts) => {
 };
 
 const makeBeastResistances = (fonts: AtlasFonts): Parser<ResistanceMap> => {
+	if (fonts.locale === "pt-BR") {
+		return (ptr) => {
+			let current = ptr;
+			const values = {} as ResistanceMap;
+			for (const damageType of DAMAGE_TYPES) {
+				const icon = nextToken(current);
+				if (!icon || !isStringToken(icon)) {
+					return [
+						{
+							error: "resistance icon",
+							distance: current[1],
+							found: icon && isStringToken(icon) ? icon : "<eof>",
+						},
+					];
+				}
+				current = inc(current);
+				const marker = nextToken(current);
+				const label = marker ? nextToken(inc(current)) : null;
+				if (
+					marker &&
+					isStringToken(marker) &&
+					/^Type3$/.test(marker.font) &&
+					label &&
+					isStringToken(label) &&
+					/^(RE|RS|IM|VU|AB|N)$/.test(label.string)
+				) {
+					values[damageType] = (label.string === "RE" ? "RS" : label.string) as Affinity;
+					current = inc(inc(current));
+				} else {
+					values[damageType] = "N";
+				}
+			}
+			return [result(values, current)];
+		};
+	}
 	const { normalFont, nonNormalFont } = fonts.resistanceFonts!;
 	const normalIcon = strWithFont([normalFont]);
 	const nonNormalIcon = strWithFont([nonNormalFont]);
@@ -254,7 +322,7 @@ const makeDescription =
 		for (;;) {
 			const t = nextToken(current);
 			if (!t || !isStringToken(t)) break;
-			if (fonts.boldFonts.some((f) => f.test(t.font)) && /^(Typical )?Traits/.test(t.string)) break;
+			if (fonts.boldFonts.some((f) => f.test(t.font)) && /^(Typical )?Traits|^Traços/.test(t.string)) break;
 			if (!fonts.descriptionFonts.some((f) => f.test(t.font))) break;
 			parts.push(t.string);
 			current = inc(current);
@@ -487,10 +555,10 @@ export const makeAtlasBeastiary = (fonts: AtlasFonts): Parser<Beast[]> => {
 	const traitsHeader = atlasTraitsHeader(fonts.boldFonts);
 	const traitsText = makeTraitsText(fonts);
 	const equipment = makeEquipment(fonts);
-	const beastAttacks = kr(text("BASIC ATTACKS"), many1(beastAttack));
-	const specialRules = kr(text("SPECIAL RULES"), many1(specialRule));
+	const beastAttacks = kr(text(fonts.locale === "pt-BR" ? "ATAQUES BÁSICOS" : "BASIC ATTACKS"), many1(beastAttack));
+	const specialRules = kr(text(fonts.locale === "pt-BR" ? "REGRAS ESPECIAIS" : "SPECIAL RULES"), many1(specialRule));
 	const otherActions = kr(
-		text("OTHER ACTIONS"),
+		text(fonts.locale === "pt-BR" ? "OUTRAS AÇÕES" : "OTHER ACTIONS"),
 		many1(kr(many1(textWithFont(fonts.otherActionIcon.char, fonts.otherActionIcon.fonts)), specialRule)),
 	);
 
@@ -498,13 +566,15 @@ export const makeAtlasBeastiary = (fonts: AtlasFonts): Parser<Beast[]> => {
 		seq(
 			atlasBeastPrefix,
 			str,
-			fmap(matches(/^Lv \d+/, "Level"), (s) => Number(s.slice(3))),
+			fmap(matches(fonts.locale === "pt-BR" ? /^Nvl\. \d+/ : /^Lv \d+/, "Level"), (s) =>
+				Number(s.replace(fonts.locale === "pt-BR" ? "Nvl. " : "Lv ", "")),
+			),
 			kr(sep, str),
 			description,
 			kr(traitsHeader, traitsText),
 			beastAttributes,
 			beastResistances,
-			alt(kr(text("Equipment:"), equipment), success(null)),
+			alt(kr(text(fonts.locale === "pt-BR" ? "Equipamento:" : "Equipment:"), equipment), success(null)),
 			alt(beastAttacks, success([] as Beast["attacks"])),
 			alt(beastSpells, success([] as Beast["spells"])),
 			alt(otherActions, success([] as Beast["otherActions"])),
@@ -560,13 +630,18 @@ export const makeAtlasBeastiary = (fonts: AtlasFonts): Parser<Beast[]> => {
 				isStringToken(name) &&
 				lv &&
 				isStringToken(lv) &&
-				/^Lv \d+$/.test(lv.string) &&
+				atlasLevelPattern(fonts).test(lv.string) &&
 				ATLAS_LEVEL_FONT.test(lv.font)
 			);
 		}
 		if (isStringToken(t)) {
 			const lv = nextToken(inc(ptr));
-			return !!(lv && isStringToken(lv) && /^Lv \d+$/.test(lv.string) && ATLAS_LEVEL_FONT.test(lv.font));
+			return !!(
+				lv &&
+				isStringToken(lv) &&
+				atlasLevelPattern(fonts).test(lv.string) &&
+				ATLAS_LEVEL_FONT.test(lv.font)
+			);
 		}
 		return false;
 	};
@@ -589,9 +664,15 @@ export const makeAtlasBeastiary = (fonts: AtlasFonts): Parser<Beast[]> => {
 		return [result(beasts, current)];
 	};
 
-	return kl(kr(atlasPageHeader, committedBeasts), seq(atlasPageTail, watermark, eof));
+	return kl(
+		kr(makeAtlasPageHeader(fonts), committedBeasts),
+		seq(atlasPageTail, alt(many1(strWithFont([/Helvetica$/, /BodoniOrnamentsITCTT$/])), eof)),
+	);
 };
 
 export const beastiaryFUHF = makeAtlasBeastiary(FUHF_FONTS);
 export const beastiaryFUTF = makeAtlasBeastiary(FUTF_FONTS);
 export const beastiaryFUNF = makeAtlasBeastiary(FUNF_FONTS);
+export const beastiaryFUHFPortuguese = makeAtlasBeastiary(FUHF_PTBR_FONTS);
+export const beastiaryFUTFPortuguese = makeAtlasBeastiary(FUTF_PTBR_FONTS);
+export const beastiaryFUNFPortuguese = makeAtlasBeastiary(FUNF_PTBR_FONTS);

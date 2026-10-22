@@ -14,7 +14,15 @@ This [Foundry Virtual Tabletop](https://foundryvtt.com/) module is designed to w
 
 ## PDF Import
 
-For the Brazilian Portuguese core rulebook, select **Core Rulebook (Português Brasil)** in the book type selector. The importer supports the Portuguese equipment and rare equipment tables, as well as the Portuguese bestiary profiles included in the core rulebook.
+For the Brazilian Portuguese core rulebook, select **Core Rulebook (Português Brasil)** in the book type selector. The importer supports the Portuguese equipment and rare equipment tables, as well as the Portuguese bestiary profiles included in the core rulebook. The importer detects the equipment page layout used by the v1.04 PDF, including its multi-page accessory table.
+
+Brazilian Portuguese Atlas PDFs are supported when selecting the matching version in the book type selector:
+
+- **Natural Fantasy Atlas (Português Brasil, v1.01)**
+- **Techno Fantasy Atlas (Português Brasil, v1.02)**
+- **High Fantasy Atlas (Português Brasil, v1.04)**
+
+Other PDF revisions may use different page layouts and are not guaranteed to parse correctly.
 
 It will currently import and create Items and Actors for:
 * Armor, Accessories, Shields, Weapons

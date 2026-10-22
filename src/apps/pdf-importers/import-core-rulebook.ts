@@ -11,7 +11,14 @@ import { beastiaryFUCR } from "../../pdf/parsers/beastiaryPage";
 import { beastiaryFUCRPortuguese } from "../../pdf/parsers/beastiaryPagePortuguese";
 import { basicWeaponsV11, consumablesV11 } from "../../pdf/parsers/basicEquipmentPage";
 import { beastiary } from "../../pdf/parsers/beastiaryPageLegacy";
-import { beastiaryFUHF, beastiaryFUTF, beastiaryFUNF } from "../../pdf/parsers/beastiaryPageAtlas";
+import {
+	beastiaryFUHF,
+	beastiaryFUTF,
+	beastiaryFUNF,
+	beastiaryFUHFPortuguese,
+	beastiaryFUTFPortuguese,
+	beastiaryFUNFPortuguese,
+} from "../../pdf/parsers/beastiaryPageAtlas";
 import { beastiaryFUBA, beastiaryFUBACompanion, extractArtPageQuickRef } from "../../pdf/parsers/beastiaryPageBestiary";
 import { arcanaFUBA } from "../../pdf/parsers/arcanaPageBestiary";
 import { rulesFUBA, speciesRulesFUBA, roleSkillsFUBA } from "../../pdf/parsers/rulePageBestiary";
@@ -52,7 +59,7 @@ const FUCR_BASIC_EQUIPMENT_PAGES = {
 
 const FUHF_PAGES = [172, 173, 174, 175, 178, 182, 183, 184, 188, 189, 190, 191, 194, 196, 197, 198] as const;
 const FUTF_PAGES = [188, 189, 190, 194, 195, 196, 200, 201, 204, 205, 206, 207, 212, 213, 214, 215] as const;
-const FUNF_PAGES = [180, 181, 186, 187, 190, 191, 192, 193, 196, 197, 198, 199, 203, 205, 207] as const;
+const FUNF_PAGES = [180, 186, 187, 190, 191, 193, 196, 197, 198, 199, 203, 205, 207] as const;
 const FUBA_PAGES = [
 	89, 90, 91, 93, 96, 97, 100, 101, 104, 105, 107, 109, 111, 113, 115, 118, 119, 120, 123, 126, 127, 131, 132, 133,
 	135, 137, 139, 141, 144, 148, 149, 152, 153, 156, 157, 158, 159, 162, 163, 165, 167, 169, 171, 173, 176, 177, 178,
@@ -71,6 +78,21 @@ const bestiaryPages = (parser: typeof beastiaryFUCR, pages: readonly number[], f
 const FUHF_BESTIARY_PAGES = bestiaryPages(beastiaryFUHF, FUHF_PAGES, "High Fantasy Bestiary");
 const FUTF_BESTIARY_PAGES = bestiaryPages(beastiaryFUTF, FUTF_PAGES, "Techno Fantasy Bestiary");
 const FUNF_BESTIARY_PAGES = bestiaryPages(beastiaryFUNF, FUNF_PAGES, "Natural Fantasy Bestiary");
+const FUHF_PTBR_BESTIARY_PAGES = bestiaryPages(
+	beastiaryFUHFPortuguese,
+	FUHF_PAGES,
+	"High Fantasy Bestiary",
+);
+const FUTF_PTBR_BESTIARY_PAGES = bestiaryPages(
+	beastiaryFUTFPortuguese,
+	FUTF_PAGES,
+	"Techno Fantasy Bestiary",
+);
+const FUNF_PTBR_BESTIARY_PAGES = bestiaryPages(
+	beastiaryFUNFPortuguese,
+	FUNF_PAGES,
+	"Natural Fantasy Bestiary",
+);
 const FUBA_BESTIARY_PAGES = bestiaryPages(beastiaryFUBA, FUBA_PAGES, "Bestiary Vol.1");
 const FUBA_COMPANION_PAGES = [330, 331, 332, 333, 334, 335, 336, 337, 338] as const;
 const FUBA_COMPANION_BESTIARY_PAGES = bestiaryPages(beastiaryFUBACompanion, FUBA_COMPANION_PAGES, "Bestiary Vol.1");
@@ -385,6 +407,12 @@ const PT_BR_PAGES = {
 	289: [["Equipment", "Accessories"], (f: Wrapper) => f(accessories, saveAccessories)],
 } as const satisfies Record<number, [readonly string[], (f: Wrapper) => Promise<ParseResult>]>;
 
+const PT_BR_ACCESSORY_PAGES = {
+	289: [["Equipment", "Accessories"], (f: Wrapper) => f(accessories, saveAccessories)],
+	290: [["Equipment", "Accessories"], (f: Wrapper) => f(accessories, saveAccessories)],
+	291: [["Equipment", "Accessories"], (f: Wrapper) => f(accessories, saveAccessories)],
+} as const satisfies Record<number, [readonly string[], (f: Wrapper) => Promise<ParseResult>]>;
+
 const PT_BR_BESTIARY_PAGES = Object.fromEntries(
 	[
 		...Array.from({ length: 9 }, (_, index) => 328 + index),
@@ -417,7 +445,8 @@ function importPages(
 							all.findIndex(
 								(other) =>
 									other.result[1][1] === parse.result[1][1] &&
-									JSON.stringify(other.result[0]) === JSON.stringify(parse.result[0]),
+									JSON.stringify(other.result[0], (key, value) => (key === "image" ? undefined : value)) ===
+										JSON.stringify(parse.result[0], (key, value) => (key === "image" ? undefined : value)),
 							) === index,
 					);
 					if (successes.length == 1) {
@@ -490,7 +519,34 @@ export function importCoreRulebook(
 export function importCorePortuguese(
 	withPage: <R>(pageNum: number, f: (d: Token[]) => Promise<R>) => Promise<[R, () => boolean]>,
 ): Promise<ParseResult[]> {
-	return importPages({ ...PT_BR_PAGES, ...PT_BR_BESTIARY_PAGES }, "FUCR-PT", withPage, undefined, undefined, false);
+	return Promise.all([108, 289, 290, 291].map((page) => withPage(page, async (tokens) => tokens))).then(
+		([consumablesPageResult, page289, page290, page291]) => {
+			const hasText = (tokens: Token[], text: string) =>
+				tokens.some((token) => token.kind === "String" && token.string === text);
+			const [consumablesTokens, consumablesCleanup] = consumablesPageResult;
+			const [, page289Cleanup] = page289;
+			const [page290Tokens, page290Cleanup] = page290;
+			const [page291Tokens, page291Cleanup] = page291;
+			consumablesCleanup();
+			page289Cleanup();
+			page290Cleanup();
+			page291Cleanup();
+
+			const pages: Record<number, [readonly string[], (f: Wrapper) => Promise<ParseResult>]> = {
+				...PT_BR_PAGES,
+				...PT_BR_BESTIARY_PAGES,
+			};
+			delete pages[108];
+			if (hasText(consumablesTokens, "CONSUMÍVEIS")) {
+				pages[108] = PT_BR_PAGES[108];
+			}
+			if (hasText(page290Tokens, "ACESSÓRIO") && hasText(page291Tokens, "ACESSÓRIO")) {
+				pages[290] = PT_BR_ACCESSORY_PAGES[290];
+				pages[291] = PT_BR_ACCESSORY_PAGES[291];
+			}
+			return importPages(pages, "FUCR-PT", withPage, undefined, undefined, false);
+		},
+	);
 }
 
 export function importCoreBestiary(
@@ -508,19 +564,19 @@ export function importCoreBasicEquipment(
 export function importHighFantasyBestiary(
 	withPage: <R>(pageNum: number, f: (d: Token[]) => Promise<R>) => Promise<[R, () => boolean]>,
 ): Promise<ParseResult[]> {
-	return importPages(FUHF_BESTIARY_PAGES, "FUHF", withPage, FUHF_ART_OVERRIDES, undefined, true);
+	return importPages(FUHF_PTBR_BESTIARY_PAGES, "FUHF-PT", withPage, FUHF_ART_OVERRIDES, undefined, true);
 }
 
 export function importTechnoFantasyBestiary(
 	withPage: <R>(pageNum: number, f: (d: Token[]) => Promise<R>) => Promise<[R, () => boolean]>,
 ): Promise<ParseResult[]> {
-	return importPages(FUTF_BESTIARY_PAGES, "FUTF", withPage, FUTF_ART_OVERRIDES, undefined, true);
+	return importPages(FUTF_PTBR_BESTIARY_PAGES, "FUTF-PT", withPage, FUTF_ART_OVERRIDES, undefined, true);
 }
 
 export function importNaturalFantasyBestiary(
 	withPage: <R>(pageNum: number, f: (d: Token[]) => Promise<R>) => Promise<[R, () => boolean]>,
 ): Promise<ParseResult[]> {
-	return importPages(FUNF_BESTIARY_PAGES, "FUNF", withPage, FUNF_ART_OVERRIDES, undefined, true);
+	return importPages(FUNF_PTBR_BESTIARY_PAGES, "FUNF-PT", withPage, FUNF_ART_OVERRIDES, undefined, true);
 }
 
 export async function importBestiaryVol1(
